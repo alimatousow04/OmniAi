@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniAI — Workspace</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono&family=Lexend:wght@600&display=swap" rel="stylesheet">
+</head>
+<body class="app-layout">
+
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">OmniAI</div>
+            <button class="btn-new-chat"><i class="fa-solid fa-plus"></i> Nouveau Chat</button>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <div class="nav-group">
+                <small class="mono">NAVIGATION</small>
+                <a href="#" class="active"><i class="fa-solid fa-message"></i> Chat</a>
+                <a href="#"><i class="fa-solid fa-chart-line"></i> Tableau de bord</a>
+                <a href="#"><i class="fa-solid fa-gear"></i> Paramètres</a>
+            </div>
+            
+            <div class="nav-group history">
+                <small class="mono">RÉCENT</small>
+                <div class="history-list" id="history-list">
+                    </div>
+            </div>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="avatar">AS</div>
+                <div class="user-info">
+                    <span class="username">Solène A.</span>
+                    <span class="status mono">Online</span>
+                </div>
+            </div>
+            <button class="btn-logout" title="Déconnexion"><i class="fa-solid fa-power-off"></i></button>
+        </div>
+    </aside>
+
+    <main class="chat-area">
+        <header class="chat-header">
+            <div class="model-selector" onclick="openModelModal()">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/8/8a/Google_Gemini_logo.svg" alt="Gemini" id="current-model-icon">
+                <span id="current-model-name">Gemini 2.0 Flash</span>
+                <i class="fa-solid fa-chevron-down"></i>
+            </div>
+            <div class="session-stats mono">
+                <span class="quota-pill">18/20 REQ RESTANTES</span>
+            </div>
+        </header>
+
+        <section class="messages-container" id="chat-messages">
+            <div class="message assistant">
+                <div class="msg-content">Bonjour ! Je suis OmniAI. Quel modèle souhaitez-vous utiliser pour commencer ?</div>
+                <div class="msg-meta mono">16:42 • Gemini 2.0</div>
+            </div>
+        </section>
+
+        <footer class="input-container">
+            <div class="input-wrapper">
+                <button class="btn-icon"><i class="fa-solid fa-paperclip"></i></button>
+                <textarea id="user-input" placeholder="Posez votre question à l'IA..." rows="1"></textarea>
+                <button class="btn-icon"><i class="fa-solid fa-microphone"></i></button>
+                <button class="btn-send" id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+            <p class="input-hint mono">SHIFT + ENTER POUR SAUTER UNE LIGNE</p>
+        </footer>
+    </main>
+
+    <div id="model-modal" class="modal">
+        <div class="modal-content">
+            <h2>Sélectionner un modèle</h2>
+            <div class="model-grid">
+                <div class="model-card active" onclick="selectModel('Gemini 2.0 Flash', 'google')">
+                    <i class="fa-solid fa-bolt"></i>
+                    <h3>Gemini 2.0 Flash</h3>
+                    <p>Rapide & Multimodal</p>
+                    <span class="badge">Principal</span>
+                </div>
+                <div class="model-card" onclick="selectModel('Llama 3.3 70B', 'meta')">
+                    <i class="fa-solid fa-brain"></i>
+                    <h3>Llama 3.3 70B</h3>
+                    <p>Puissant via Groq</p>
+                    <span class="badge">Fallback 1</span>
+                </div>
+                <div class="model-card" onclick="selectModel('GPT-4o', 'openai')">
+                    <i class="fa-solid fa-microchip"></i>
+                    <h3>GPT-4o</h3>
+                    <p>Référence via GitHub</p>
+                    <span class="badge">Fallback 2</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="toggle-container">
+                    <span>Routage dynamique (Auto-Fallback)</span>
+                    <input type="checkbox" id="dynamic-routing" checked>
+                </div>
+                <button class="btn-primary" onclick="closeModelModal()">Confirmer</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

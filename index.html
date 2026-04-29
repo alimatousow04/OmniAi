@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniAI — Connexion</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&family=Lexend:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="auth-page">
+    <div class="auth-container">
+        <header class="auth-header">
+            <div class="logo">OmniAI</div>
+            <p class="subtitle">Votre espace de travail IA unifié.</p>
+        </header>
+
+        <main class="auth-card">
+            <div id="login-form">
+                <h1>Connexion</h1>
+                <form id="form-signin">
+                    <div class="form-group">
+                        <label for="login-email">Email entreprise</label>
+                        <input type="email" id="login-email" placeholder="nom@entreprise.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Mot de passe</label>
+                        <input type="password" id="login-password" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Se connecter</button>
+                </form>
+                <p class="auth-footer">Pas de compte ? <a href="#" onclick="toggleAuth()">S'inscrire</a></p>
+            </div>
+
+            <div id="register-form" style="display: none;">
+                <h1>Inscription</h1>
+                <form id="form-signup">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="reg-firstname">Prénom</label>
+                            <input type="text" id="reg-firstname" placeholder="Jean" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-lastname">Nom</label>
+                            <input type="text" id="reg-lastname" placeholder="Dupont" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-email">Email entreprise</label>
+                        <input type="email" id="reg-email" placeholder="nom@entreprise.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-company">Entreprise (facultatif)</label>
+                        <input type="text" id="reg-company" placeholder="Nom de l'entreprise">
+                    </div>
+                    <div class="form-group">
+                        <label for="reg-password">Mot de passe</label>
+                        <input type="password" id="reg-password" placeholder="8 caractères minimum" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Créer un compte</button>
+                </form>
+                <p class="auth-footer">Déjà un compte ? <a href="#" onclick="toggleAuth()">Se connecter</a></p>
+            </div>
+        </main>
+
+        <footer class="page-footer">
+            <p class="mono">SYSTEM STATUS: OPERATIONAL</p>
+        </footer>
+    </div>
+
+    <script>
+        function toggleAuth() {
+            const login = document.getElementById('login-form');
+            const register = document.getElementById('register-form');
+            if (login.style.display === 'none') {
+                login.style.display = 'block';
+                register.style.display = 'none';
+            } else {
+                login.style.display = 'none';
+                register.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
