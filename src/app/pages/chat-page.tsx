@@ -84,7 +84,7 @@ export function ChatPage() {
     setConversationId(id);
 
     const token = localStorage.getItem("omni_token");
-    fetch(`http://localhost:3001/api/conversations/${id}/messages`, {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/conversations/${id}/messages`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
@@ -120,7 +120,7 @@ export function ChatPage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:3001/api/chat/send", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/chat/send`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

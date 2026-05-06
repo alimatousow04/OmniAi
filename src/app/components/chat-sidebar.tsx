@@ -47,7 +47,7 @@ export function ChatSidebar() {
       return;
     }
 
-    fetch("http://localhost:3001/api/conversations", {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/conversations`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())

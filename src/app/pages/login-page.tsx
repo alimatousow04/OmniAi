@@ -23,8 +23,8 @@ export function LoginPage() {
 
     const endpoint =
       mode === "login"
-        ? "http://localhost:3001/api/auth/login"
-        : "http://localhost:3001/api/auth/register";
+        ? `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/login`
+        : `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/register`;
 
     const body =
       mode === "login"
