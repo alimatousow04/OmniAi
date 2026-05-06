@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams } from "react-router";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
@@ -53,22 +54,54 @@ const modelNames: Record<string, string> = {
   gpt4o: "GPT-4o",
 };
 
+const WELCOME_MESSAGE: Message = {
+  id: "0",
+  role: "assistant",
+  content: "Bonjour ! Je suis votre assistant IA OmniAI. Comment puis-je vous aider ?",
+  timestamp: new Date(),
+  model: "gemini",
+};
+
 export function ChatPage() {
+  const { chatId } = useParams<{ chatId?: string }>();
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini");
   const [inputValue, setInputValue] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Bonjour ! Je suis votre assistant IA OmniAI. Comment puis-je vous aider ?",
-      timestamp: new Date(),
-      model: "gemini",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
   const [dynamicRouting, setDynamicRouting] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!chatId) {
+      setMessages([WELCOME_MESSAGE]);
+      setConversationId(null);
+      return;
+    }
+
+    const id = parseInt(chatId);
+    setConversationId(id);
+
+    const token = localStorage.getItem("omni_token");
+    fetch(`http://localhost:3001/api/conversations/${id}/messages`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data: Array<{ id: number; role: string; contenu: string; modele_utilise: string | null; created_at: string }>) => {
+        if (!Array.isArray(data)) return;
+        setMessages(
+          data.map((m) => ({
+            id: String(m.id),
+            role: m.role as "user" | "assistant",
+            content: m.contenu,
+            timestamp: new Date(m.created_at),
+            model: (m.modele_utilise ?? undefined) as AIModel | undefined,
+          }))
+        );
+      })
+      .catch(() => setMessages([WELCOME_MESSAGE]));
+  }, [chatId]);
 
   const currentModel = models.find((m) => m.id === selectedModel)!;
 
@@ -89,8 +122,15 @@ export function ChatPage() {
     try {
       const response = await fetch("http://localhost:3001/api/chat/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })), model: selectedModel }),
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + localStorage.getItem("omni_token"),
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
+          model: selectedModel,
+          conversationId,
+        }),
       });
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -106,6 +146,8 @@ export function ChatPage() {
       };
 
       const newMessages: Message[] = [aiMessage];
+
+      if (data.conversationId) setConversationId(data.conversationId);
 
       if (data.fallback === true) {
         setSelectedModel(data.model as AIModel);

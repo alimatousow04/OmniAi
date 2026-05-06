@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { Button } from "../components/ui/button";
 import { Plus, MessageSquare, Clock } from "lucide-react";
 import { motion } from "motion/react";
@@ -35,6 +36,7 @@ function formatTime(dateStr: string): string {
 const GROUP_ORDER = ["Aujourd'hui", "Hier", "Cette semaine", "Plus ancien"];
 
 export function ChatSidebar() {
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -64,7 +66,10 @@ export function ChatSidebar() {
   return (
     <aside className="w-72 bg-[#0D1B2A] border-r border-white/10 flex flex-col">
       <div className="p-4 border-b border-white/10">
-        <Button className="w-full bg-[#00B4CC] hover:bg-[#00B4CC]/90 text-white justify-start">
+        <Button
+          onClick={() => navigate("/app")}
+          className="w-full bg-[#00B4CC] hover:bg-[#00B4CC]/90 text-white justify-start"
+        >
           <Plus className="w-5 h-5 mr-2" />
           New Chat
         </Button>
@@ -86,6 +91,7 @@ export function ChatSidebar() {
                   <motion.button
                     key={conv.id}
                     whileHover={{ x: 4 }}
+                    onClick={() => navigate(`/app/chat/${conv.id}`)}
                     className="w-full flex items-start gap-3 px-3 py-2.5 rounded-lg text-left transition-colors hover:bg-[#7B4FD4]/10 text-white/70 hover:text-white group"
                   >
                     <MessageSquare className="w-4 h-4 mt-0.5 flex-shrink-0 text-white/40 group-hover:text-[#7B4FD4]" />
