@@ -29,6 +29,7 @@ interface Message {
   content: string;
   timestamp: Date;
   model?: AIModel;
+  isFallback?: boolean;
 }
 
 interface ModelInfo {
@@ -46,6 +47,11 @@ const models: ModelInfo[] = [
   { id: "gpt4o", name: "GPT-4o", logo: "🔮", color: "#10A37F", quota: 12, maxQuota: 20 },
 ];
 
+const modelNames: Record<string, string> = {
+  gemini: "Gemini 2.0 Flash",
+  llama: "Llama 3.3 70B",
+  gpt4o: "GPT-4o",
+};
 
 export function ChatPage() {
   const [selectedModel, setSelectedModel] = useState<AIModel>("gemini");
@@ -54,7 +60,7 @@ export function ChatPage() {
     {
       id: "1",
       role: "assistant",
-      content: "Hello! I'm your AI assistant powered by Gemini 2.0 Flash. How can I help you today?\n\nI can help with coding, writing, analysis, and more. For example, here's a quick code snippet:\n\n```javascript\nconst greeting = 'Welcome to OmniAI!';\nconsole.log(greeting);\n```",
+      content: "Bonjour ! Je suis votre assistant IA OmniAI. Comment puis-je vous aider ?",
       timestamp: new Date(),
       model: "gemini",
     },
@@ -96,10 +102,24 @@ export function ChatPage() {
         role: "assistant",
         content: data.content ?? data.message ?? JSON.stringify(data),
         timestamp: new Date(),
-        model: selectedModel,
+        model: data.model as AIModel,
       };
 
-      setMessages((prev) => [...prev, aiMessage]);
+      const newMessages: Message[] = [aiMessage];
+
+      if (data.fallback === true) {
+        setSelectedModel(data.model as AIModel);
+        newMessages.push({
+          id: (Date.now() + 2).toString(),
+          role: "assistant",
+          content: `Basculé automatiquement vers ${modelNames[data.model]}`,
+          timestamp: new Date(),
+          model: data.model as AIModel,
+          isFallback: true,
+        });
+      }
+
+      setMessages((prev) => [...prev, ...newMessages]);
     } catch (err) {
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -228,11 +248,13 @@ export function ChatPage() {
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-2xl ${
-                  message.role === "user"
+                className={`max-w-2xl rounded-lg p-4 ${
+                  message.isFallback
+                    ? "bg-[#7B4FD4]/15 border border-[#7B4FD4]/30 text-[#7B4FD4] text-sm italic"
+                    : message.role === "user"
                     ? "bg-[#00B4CC]/15 border border-[#00B4CC]/30 text-white"
                     : "bg-[#1A2B3C] text-white"
-                } rounded-lg p-4`}
+                }`}
               >
                 <MessageContent content={message.content} />
                 <div className="flex items-center gap-2 mt-2 text-xs text-white/50">

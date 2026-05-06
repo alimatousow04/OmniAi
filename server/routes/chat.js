@@ -2,7 +2,9 @@ import express from 'express'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import Groq from 'groq-sdk'
 import OpenAI from 'openai'
+import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
+import pool from '../db.js'
 
 dotenv.config()
 
@@ -17,12 +19,14 @@ const github = new OpenAI({
 
 async function callGemini(messages) {
   const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash' })
-  const history = messages.slice(0, -1).map(m => ({
+  const firstUserIndex = messages.findIndex(m => m.role === 'user')
+  const trimmed = firstUserIndex > 0 ? messages.slice(firstUserIndex) : messages
+  const history = trimmed.slice(0, -1).map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }]
   }))
   const chat = model.startChat({ history })
-  const result = await chat.sendMessage(messages.at(-1).content)
+  const result = await chat.sendMessage(trimmed.at(-1).content)
   return result.response.text()
 }
 
@@ -42,8 +46,23 @@ async function callGPT4o(messages) {
   return res.choices[0].message.content
 }
 
+function extractUserId(req) {
+  const authHeader = req.headers['authorization']
+  if (!authHeader?.startsWith('Bearer ')) return null
+  try {
+    const payload = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET)
+    return payload.id ?? null
+  } catch {
+    return null
+  }
+}
+
+function buildTitle(firstMessage) {
+  return firstMessage.trim().split(/\s+/).slice(0, 5).join(' ')
+}
+
 router.post('/send', async (req, res) => {
-  const { messages, model = 'gemini' } = req.body
+  const { messages, model = 'gemini', conversationId } = req.body
 
   const chain = [
     { name: 'gemini', fn: callGemini },
@@ -51,20 +70,62 @@ router.post('/send', async (req, res) => {
     { name: 'gpt4o', fn: callGPT4o }
   ]
 
-  // Démarre par le modèle choisi
   const startIndex = chain.findIndex(m => m.name === model)
   const ordered = [...chain.slice(startIndex), ...chain.slice(0, startIndex)]
 
+  let content, usedModel
+
   for (const { name, fn } of ordered) {
     try {
-      const content = await fn(messages)
-      return res.json({ content, model: name, fallback: name !== model })
+      content = await fn(messages)
+      usedModel = name
+      break
     } catch (err) {
       console.warn(`${name} failed:`, err.message)
       if (name === ordered.at(-1).name) {
         return res.status(503).json({ error: 'Tous les modèles sont indisponibles.' })
       }
     }
+  }
+
+  const userId = extractUserId(req)
+
+  if (!userId) {
+    return res.json({ content, model: usedModel, fallback: usedModel !== model })
+  }
+
+  try {
+    let convId = conversationId ?? null
+
+    if (!convId) {
+      const titre = buildTitle(messages.at(-1)?.content ?? 'Nouvelle conversation')
+      const [result] = await pool.query(
+        'INSERT INTO conversations (id_utilisateur, titre) VALUES (?, ?)',
+        [userId, titre]
+      )
+      convId = result.insertId
+    }
+
+    const userMessage = messages.at(-1)
+    await pool.query(
+      'INSERT INTO messages (id_conversation, role, contenu, modele_utilise) VALUES (?, ?, ?, NULL)',
+      [convId, userMessage.role, userMessage.content]
+    )
+
+    await pool.query(
+      'INSERT INTO messages (id_conversation, role, contenu, modele_utilise) VALUES (?, ?, ?, ?)',
+      [convId, 'assistant', content, usedModel]
+    )
+
+    return res.json({
+      content,
+      model: usedModel,
+      fallback: usedModel !== model,
+      conversationId: convId
+    })
+  } catch (err) {
+    console.error('[chat/send] db error:', err.message)
+    return res.json({ content, model: usedModel, fallback: usedModel !== model })
   }
 })
 
