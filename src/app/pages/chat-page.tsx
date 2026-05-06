@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 
-type AIModel = "claude" | "gemini" | "gpt4o";
+type AIModel = "gemini" | "llama" | "gpt4o";
 
 interface Message {
   id: string;
@@ -41,20 +41,14 @@ interface ModelInfo {
 }
 
 const models: ModelInfo[] = [
-  { id: "claude", name: "Gemini 2.0 Flash", logo: "✨", color: "#FF6B35", quota: 18, maxQuota: 20 },
-  { id: "gemini", name: "Llama 3.3 70B", logo: "🦙", color: "#4285F4", quota: 15, maxQuota: 20 },
+  { id: "gemini", name: "Gemini 2.0 Flash", logo: "✨", color: "#FF6B35", quota: 18, maxQuota: 20 },
+  { id: "llama", name: "Llama 3.3 70B", logo: "🦙", color: "#4285F4", quota: 15, maxQuota: 20 },
   { id: "gpt4o", name: "GPT-4o", logo: "🔮", color: "#10A37F", quota: 12, maxQuota: 20 },
 ];
 
-const mockConversations = [
-  { id: "1", title: "Building a React dashboard", time: "2 hours ago", group: "Today" },
-  { id: "2", title: "API integration help", time: "4 hours ago", group: "Today" },
-  { id: "3", title: "Database schema design", time: "Yesterday", group: "Yesterday" },
-  { id: "4", title: "UI/UX best practices", time: "2 days ago", group: "This Week" },
-];
 
 export function ChatPage() {
-  const [selectedModel, setSelectedModel] = useState<AIModel>("claude");
+  const [selectedModel, setSelectedModel] = useState<AIModel>("gemini");
   const [inputValue, setInputValue] = useState("");
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -62,17 +56,18 @@ export function ChatPage() {
       role: "assistant",
       content: "Hello! I'm your AI assistant powered by Gemini 2.0 Flash. How can I help you today?\n\nI can help with coding, writing, analysis, and more. For example, here's a quick code snippet:\n\n```javascript\nconst greeting = 'Welcome to OmniAI!';\nconsole.log(greeting);\n```",
       timestamp: new Date(),
-      model: "claude",
+      model: "gemini",
     },
   ]);
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
   const [dynamicRouting, setDynamicRouting] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const currentModel = models.find((m) => m.id === selectedModel)!;
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -81,16 +76,42 @@ export function ChatPage() {
       timestamp: new Date(),
     };
 
-    const aiMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: "assistant",
-      content: "This is a demo response. In a real application, this would be the AI's response to your message.",
-      timestamp: new Date(),
-      model: selectedModel,
-    };
-
-    setMessages([...messages, userMessage, aiMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("http://localhost:3001/api/chat/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })), model: selectedModel }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.content ?? data.message ?? JSON.stringify(data),
+        timestamp: new Date(),
+        model: selectedModel,
+      };
+
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (err) {
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `Erreur : impossible de contacter le serveur. (${err instanceof Error ? err.message : String(err)})`,
+        timestamp: new Date(),
+        model: selectedModel,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -266,7 +287,8 @@ export function ChatPage() {
             </div>
             <Button
               onClick={handleSend}
-              className="bg-[#00B4CC] hover:bg-[#00B4CC]/90 text-white h-[60px] px-6"
+              disabled={isLoading}
+              className="bg-[#00B4CC] hover:bg-[#00B4CC]/90 text-white h-[60px] px-6 disabled:opacity-50"
             >
               <Send className="w-5 h-5" />
             </Button>
