@@ -35,16 +35,29 @@ function formatTime(dateStr: string): string {
 
 const GROUP_ORDER = ["Aujourd'hui", "Hier", "Cette semaine", "Plus ancien"];
 
+interface UserInfo {
+  prenom: string | null;
+  email: string;
+}
+
 export function ChatSidebar() {
   const navigate = useNavigate();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
 
   useEffect(() => {
     const token = localStorage.getItem("omni_token");
     if (!token) {
       setIsLoading(false);
       return;
+    }
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      setUserInfo({ prenom: payload.prenom ?? null, email: payload.email });
+    } catch {
+      // token malformé, on ignore
     }
 
     fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/conversations`, {
@@ -109,6 +122,15 @@ export function ChatSidebar() {
           ))
         )}
       </div>
+
+      {userInfo && (
+        <div className="p-4 border-t border-white/10">
+          <p className="text-sm font-medium text-white truncate">
+            {userInfo.prenom ?? userInfo.email}
+          </p>
+          <p className="text-xs text-white/40 truncate">{userInfo.email}</p>
+        </div>
+      )}
     </aside>
   );
 }

@@ -37,7 +37,7 @@ router.post('/register', async (req, res) => {
       [prenom ?? null, email, hashedPassword]
     )
 
-    const token = signToken({ id: result.insertId, email })
+    const token = signToken({ id: result.insertId, email, prenom: prenom ?? null })
     res.status(201).json({ token })
   } catch (err) {
     console.error('[register]', err)
@@ -55,7 +55,7 @@ router.post('/login', async (req, res) => {
 
   try {
     const [rows] = await pool.query(
-      'SELECT id, email, mot_de_passe_hash FROM users WHERE email = ?',
+      'SELECT id, email, prenom, mot_de_passe_hash FROM users WHERE email = ?',
       [email]
     )
 
@@ -70,7 +70,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Identifiants incorrects' })
     }
 
-    const token = signToken({ id: user.id, email: user.email })
+    const token = signToken({ id: user.id, email: user.email, prenom: user.prenom })
     res.json({ token })
   } catch (err) {
     console.error('[login]', err)
