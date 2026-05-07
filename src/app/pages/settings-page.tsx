@@ -9,8 +9,62 @@ import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Eye, EyeOff, Save } from "lucide-react";
 
+function decodeToken(token: string | null) {
+  if (!token) return {} as Record<string, string>;
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(token.split('.')[1])))) as Record<string, string>;
+  } catch {
+    return {} as Record<string, string>;
+  }
+}
+
 export function SettingsPage() {
-  const [darkMode, setDarkMode] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+
+  function handleDarkModeChange(checked: boolean) {
+    setDarkMode(checked);
+    document.documentElement.classList.toggle('dark', checked);
+    localStorage.setItem('theme', checked ? 'dark' : 'light');
+  }
+
+  const [profile, setProfile] = useState(() => {
+    const payload = decodeToken(localStorage.getItem('omni_token'));
+    return {
+      firstName: payload.prenom ?? '',
+      lastName: '',
+      email: payload.email ?? '',
+      company: '',
+    };
+  });
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSave() {
+    const token = localStorage.getItem('omni_token');
+    setError('');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ prenom: profile.firstName, email: profile.email }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error ?? 'Erreur serveur');
+        return;
+      }
+      const data = await res.json();
+      localStorage.setItem('omni_token', data.token);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setError('Impossible de contacter le serveur');
+    }
+  }
+
   const [showApiKeys, setShowApiKeys] = useState({
     claude: false,
     gemini: false,
@@ -54,7 +108,8 @@ export function SettingsPage() {
                 </Label>
                 <Input
                   id="firstName"
-                  defaultValue="John"
+                  value={profile.firstName}
+                  onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
                   className="bg-[#0D1B2A] border-white/10 text-white"
                 />
               </div>
@@ -64,7 +119,8 @@ export function SettingsPage() {
                 </Label>
                 <Input
                   id="lastName"
-                  defaultValue="Doe"
+                  value={profile.lastName}
+                  onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
                   className="bg-[#0D1B2A] border-white/10 text-white"
                 />
               </div>
@@ -77,7 +133,8 @@ export function SettingsPage() {
               <Input
                 id="email"
                 type="email"
-                defaultValue="john@company.com"
+                value={profile.email}
+                onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                 className="bg-[#0D1B2A] border-white/10 text-white"
               />
             </div>
@@ -88,7 +145,8 @@ export function SettingsPage() {
               </Label>
               <Input
                 id="company"
-                defaultValue="Acme Inc."
+                value={profile.company}
+                onChange={(e) => setProfile({ ...profile, company: e.target.value })}
                 className="bg-[#0D1B2A] border-white/10 text-white"
               />
             </div>
@@ -208,7 +266,7 @@ export function SettingsPage() {
               <Switch
                 id="dark-mode"
                 checked={darkMode}
-                onCheckedChange={setDarkMode}
+                onCheckedChange={handleDarkModeChange}
               />
             </div>
 
@@ -285,10 +343,11 @@ export function SettingsPage() {
         </Card>
 
         {/* Save Button */}
-        <div className="flex justify-end">
-          <Button className="bg-[#00B4CC] hover:bg-[#00B4CC]/90 text-white px-8">
+        <div className="flex items-center justify-end gap-4">
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          <Button onClick={handleSave} className="bg-[#00B4CC] hover:bg-[#00B4CC]/90 text-white px-8">
             <Save className="w-4 h-4 mr-2" />
-            Save Changes
+            {saved ? 'Saved!' : 'Save Changes'}
           </Button>
         </div>
       </div>

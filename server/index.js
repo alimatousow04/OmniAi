@@ -5,17 +5,25 @@ import dotenv from 'dotenv'
 import chatRouter from './routes/chat.js'
 import authRouter from './routes/auth.js'
 import conversationsRouter from './routes/conversations.js'
+import quotasRouter from './routes/quotas.js'
 import pool from './db.js'
 
 dotenv.config()
 
 const app = express()
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }))
+// app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }))
+app.use(cors({
+  origin: [
+    'http://localhost:5173',
+    process.env.FRONTEND_URL || 'http://localhost:5173'
+  ]
+}))
 app.use(express.json())
 
 app.use('/api/auth', authRouter)
 app.use('/api/chat', chatRouter)
 app.use('/api/conversations', conversationsRouter)
+app.use('/api/quotas', quotasRouter)
 
 app.get('/api/health', async (_req, res) => {
   try {

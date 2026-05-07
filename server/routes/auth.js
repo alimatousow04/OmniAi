@@ -78,4 +78,32 @@ router.post('/login', async (req, res) => {
   }
 })
 
+// PUT /api/auth/profile
+router.put('/profile', async (req, res) => {
+  const auth = req.headers['authorization']
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Non autorisé' })
+
+  let payload
+  try {
+    payload = jwt.verify(auth.slice(7), JWT_SECRET)
+  } catch {
+    return res.status(401).json({ error: 'Token invalide' })
+  }
+
+  const { prenom, email } = req.body
+  if (!email) return res.status(400).json({ error: 'Email requis' })
+
+  try {
+    await pool.query(
+      'UPDATE users SET prenom = ?, email = ? WHERE id = ?',
+      [prenom ?? null, email, payload.id]
+    )
+    const token = signToken({ id: payload.id, email, prenom: prenom ?? null })
+    res.json({ token })
+  } catch (err) {
+    console.error('[profile]', err)
+    res.status(500).json({ error: 'Erreur serveur' })
+  }
+})
+
 export default router

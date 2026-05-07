@@ -46,6 +46,18 @@ async function callGPT4o(messages) {
   return res.choices[0].message.content
 }
 
+const QUOTA_PROVIDER = { gemini: 'google', llama: 'groq', gpt4o: 'github' }
+const QUOTA_INIT = { gemini: [14, 1499], llama: [29, 14399], gpt4o: [14, 149] }
+
+function updateQuota(model) {
+  const provider = QUOTA_PROVIDER[model] ?? 'unknown'
+  const [rpm, rpd] = QUOTA_INIT[model] ?? [99, 999]
+  pool.query(
+    'INSERT INTO quotas_serveur (modele, provider, rpm_restant, rpd_restant) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE rpm_restant = rpm_restant - 1, rpd_restant = rpd_restant - 1',
+    [model, provider, rpm, rpd]
+  ).catch(err => console.warn('[quota]', err.message))
+}
+
 function extractUserId(req) {
   const authHeader = req.headers['authorization']
   if (!authHeader?.startsWith('Bearer ')) return null
@@ -79,6 +91,7 @@ router.post('/send', async (req, res) => {
     try {
       content = await fn(messages)
       usedModel = name
+      updateQuota(name)
       break
     } catch (err) {
       console.warn(`${name} failed:`, err.message)
