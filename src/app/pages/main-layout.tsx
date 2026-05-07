@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router";
 import { Button } from "../components/ui/button";
 import {
@@ -5,14 +6,30 @@ import {
   BarChart3,
   Settings,
   LogOut,
-  Plus,
   Layers,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 
+function decodeToken(token: string | null) {
+  if (!token) return {};
+  try {
+    return JSON.parse(decodeURIComponent(escape(atob(token.split('.')[1]))));
+  } catch {
+    return {};
+  }
+}
+
 export function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  useEffect(() => {
+    if (localStorage.getItem('theme') === 'dark') {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const { email, prenom } = decodeToken(localStorage.getItem("omni_token"));
+  const displayName = email?.split("@")[0] ?? "Utilisateur";
 
   const navItems = [
     { icon: MessageSquare, label: "Chat", path: "/app" },
@@ -68,11 +85,11 @@ export function MainLayout() {
           <div className="flex items-center gap-3">
             <Avatar className="w-10 h-10">
               <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" />
-              <AvatarFallback>JD</AvatarFallback>
+              <AvatarFallback>{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">John Doe</p>
-              <p className="text-xs text-white/60 truncate">john@company.com</p>
+              <p className="text-sm font-medium text-white truncate">{prenom ?? displayName}</p>
+              <p className="text-xs text-white/60 truncate">{email ?? ""}</p>
             </div>
             <Button
               size="icon"

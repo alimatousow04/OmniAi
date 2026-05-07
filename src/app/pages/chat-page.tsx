@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams } from "react-router";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { Badge } from "../components/ui/badge";
@@ -21,7 +22,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 
-type AIModel = "claude" | "gemini" | "gpt4o";
+type AIModel = "gemini" | "llama" | "gpt4o";
 
 interface Message {
   id: string;
@@ -29,6 +30,7 @@ interface Message {
   content: string;
   timestamp: Date;
   model?: AIModel;
+  isFallback?: boolean;
 }
 
 interface ModelInfo {
@@ -36,43 +38,101 @@ interface ModelInfo {
   name: string;
   logo: string;
   color: string;
-  quota: number;
-  maxQuota: number;
 }
 
+interface QuotaRow {
+  modele: string;
+  rpm_restant: number;
+  rpd_restant: number;
+}
+
+const MAX_RPM: Record<AIModel, number> = { gemini: 15, llama: 30, gpt4o: 15 };
+
 const models: ModelInfo[] = [
-  { id: "claude", name: "Gemini 2.0 Flash", logo: "✨", color: "#FF6B35", quota: 18, maxQuota: 20 },
-  { id: "gemini", name: "Llama 3.3 70B", logo: "🦙", color: "#4285F4", quota: 15, maxQuota: 20 },
-  { id: "gpt4o", name: "GPT-4o", logo: "🔮", color: "#10A37F", quota: 12, maxQuota: 20 },
+  { id: "gemini", name: "Gemini 2.0 Flash", logo: "✨", color: "#FF6B35" },
+  { id: "llama", name: "Llama 3.3 70B", logo: "🦙", color: "#4285F4" },
+  { id: "gpt4o", name: "GPT-4o", logo: "🔮", color: "#10A37F" },
 ];
 
-const mockConversations = [
-  { id: "1", title: "Building a React dashboard", time: "2 hours ago", group: "Today" },
-  { id: "2", title: "API integration help", time: "4 hours ago", group: "Today" },
-  { id: "3", title: "Database schema design", time: "Yesterday", group: "Yesterday" },
-  { id: "4", title: "UI/UX best practices", time: "2 days ago", group: "This Week" },
-];
+const modelNames: Record<string, string> = {
+  gemini: "Gemini 2.0 Flash",
+  llama: "Llama 3.3 70B",
+  gpt4o: "GPT-4o",
+};
+
+const WELCOME_MESSAGE: Message = {
+  id: "0",
+  role: "assistant",
+  content: "Bonjour ! Je suis votre assistant IA OmniAI. Comment puis-je vous aider ?",
+  timestamp: new Date(),
+  model: "gemini",
+};
 
 export function ChatPage() {
-  const [selectedModel, setSelectedModel] = useState<AIModel>("claude");
+  const { chatId } = useParams<{ chatId?: string }>();
+  const [selectedModel, setSelectedModel] = useState<AIModel>("gemini");
   const [inputValue, setInputValue] = useState("");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "1",
-      role: "assistant",
-      content: "Hello! I'm your AI assistant powered by Gemini 2.0 Flash. How can I help you today?\n\nI can help with coding, writing, analysis, and more. For example, here's a quick code snippet:\n\n```javascript\nconst greeting = 'Welcome to OmniAI!';\nconsole.log(greeting);\n```",
-      timestamp: new Date(),
-      model: "claude",
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isModelDialogOpen, setIsModelDialogOpen] = useState(false);
   const [dynamicRouting, setDynamicRouting] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [quotas, setQuotas] = useState<Record<string, QuotaRow>>({});
+
+  function getQuota(modelId: AIModel) {
+    const remaining = quotas[modelId]?.rpm_restant ?? MAX_RPM[modelId];
+    return { quota: remaining, maxQuota: MAX_RPM[modelId] };
+  }
+
+  async function fetchQuotas() {
+    const token = localStorage.getItem("omni_token");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/quotas`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data: QuotaRow[] = await res.json();
+      setQuotas(Object.fromEntries(data.map((r) => [r.modele, r])));
+    } catch {}
+  }
+
+  useEffect(() => { fetchQuotas(); }, []);
+
+  useEffect(() => {
+    if (!chatId) {
+      setMessages([WELCOME_MESSAGE]);
+      setConversationId(null);
+      return;
+    }
+
+    const id = parseInt(chatId);
+    setConversationId(id);
+
+    const token = localStorage.getItem("omni_token");
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/conversations/${id}/messages`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((r) => r.json())
+      .then((data: Array<{ id: number; role: string; contenu: string; modele_utilise: string | null; created_at: string }>) => {
+        if (!Array.isArray(data)) return;
+        setMessages(
+          data.map((m) => ({
+            id: String(m.id),
+            role: m.role as "user" | "assistant",
+            content: m.contenu,
+            timestamp: new Date(m.created_at),
+            model: (m.modele_utilise ?? undefined) as AIModel | undefined,
+          }))
+        );
+      })
+      .catch(() => setMessages([WELCOME_MESSAGE]));
+  }, [chatId]);
 
   const currentModel = models.find((m) => m.id === selectedModel)!;
 
-  const handleSend = () => {
-    if (!inputValue.trim()) return;
+  const handleSend = async () => {
+    if (!inputValue.trim() || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -81,16 +141,66 @@ export function ChatPage() {
       timestamp: new Date(),
     };
 
-    const aiMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: "assistant",
-      content: "This is a demo response. In a real application, this would be the AI's response to your message.",
-      timestamp: new Date(),
-      model: selectedModel,
-    };
-
-    setMessages([...messages, userMessage, aiMessage]);
+    setMessages((prev) => [...prev, userMessage]);
     setInputValue("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/chat/send`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + localStorage.getItem("omni_token"),
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map(m => ({ role: m.role, content: m.content })),
+          model: selectedModel,
+          conversationId,
+        }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const data = await response.json();
+
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.content ?? data.message ?? JSON.stringify(data),
+        timestamp: new Date(),
+        model: data.model as AIModel,
+      };
+
+      const newMessages: Message[] = [aiMessage];
+
+      if (data.conversationId) setConversationId(data.conversationId);
+      fetchQuotas();
+
+      if (data.fallback === true && data.model !== selectedModel) {
+        setSelectedModel(data.model as AIModel);
+        newMessages.push({
+          id: (Date.now() + 2).toString(),
+          role: "assistant",
+          content: `Basculé automatiquement vers ${modelNames[data.model]}`,
+          timestamp: new Date(),
+          model: data.model as AIModel,
+          isFallback: true,
+        });
+      }
+
+      setMessages((prev) => [...prev, ...newMessages]);
+    } catch (err) {
+      const errorMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: `Erreur : impossible de contacter le serveur. (${err instanceof Error ? err.message : String(err)})`,
+        timestamp: new Date(),
+        model: selectedModel,
+      };
+      setMessages((prev) => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -148,7 +258,7 @@ export function ChatPage() {
                           <div className="flex items-center gap-2 mt-1">
                             <Badge className="bg-[#7B4FD4] text-white text-xs">Free tier</Badge>
                             <span className="text-xs text-white/60">
-                              {model.quota}/{model.maxQuota} requests
+                              {getQuota(model.id).quota}/{getQuota(model.id).maxQuota} requests
                             </span>
                           </div>
                         </div>
@@ -158,7 +268,7 @@ export function ChatPage() {
                       </div>
                       <div className="mt-3">
                         <Progress
-                          value={(model.quota / model.maxQuota) * 100}
+                          value={(getQuota(model.id).quota / getQuota(model.id).maxQuota) * 100}
                           className="h-1.5"
                         />
                       </div>
@@ -193,7 +303,7 @@ export function ChatPage() {
           </Dialog>
 
           <Badge className="bg-[#00B4CC]/20 text-[#00B4CC] border-[#00B4CC]/30">
-            {currentModel.quota}/{currentModel.maxQuota} requests remaining
+            {getQuota(currentModel.id).quota}/{getQuota(currentModel.id).maxQuota} requests remaining
           </Badge>
         </div>
 
@@ -207,11 +317,13 @@ export function ChatPage() {
               className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
             >
               <div
-                className={`max-w-2xl ${
-                  message.role === "user"
+                className={`max-w-2xl rounded-lg p-4 ${
+                  message.isFallback
+                    ? "bg-[#7B4FD4]/15 border border-[#7B4FD4]/30 text-[#7B4FD4] text-sm italic"
+                    : message.role === "user"
                     ? "bg-[#00B4CC]/15 border border-[#00B4CC]/30 text-white"
                     : "bg-[#1A2B3C] text-white"
-                } rounded-lg p-4`}
+                }`}
               >
                 <MessageContent content={message.content} />
                 <div className="flex items-center gap-2 mt-2 text-xs text-white/50">
@@ -266,7 +378,8 @@ export function ChatPage() {
             </div>
             <Button
               onClick={handleSend}
-              className="bg-[#00B4CC] hover:bg-[#00B4CC]/90 text-white h-[60px] px-6"
+              disabled={isLoading}
+              className="bg-[#00B4CC] hover:bg-[#00B4CC]/90 text-white h-[60px] px-6 disabled:opacity-50"
             >
               <Send className="w-5 h-5" />
             </Button>
@@ -303,24 +416,34 @@ export function ChatPage() {
             </div>
 
             {/* Token Usage */}
-            <div>
-              <p className="text-sm text-white/60 mb-2">Token Usage</p>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-white">
-                  <span>This session</span>
-                  <span>1,247 / 4,000</span>
+            {(() => {
+              const maxTokens = 4000;
+              const tokenCount = Math.min(
+                Math.round(messages.reduce((sum, m) => sum + m.content.length, 0) / 4),
+                maxTokens
+              );
+              const pct = Math.round((tokenCount / maxTokens) * 100);
+              return (
+                <div>
+                  <p className="text-sm text-white/60 mb-2">Token Usage</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm text-white">
+                      <span>This session</span>
+                      <span>{tokenCount.toLocaleString()} / {maxTokens.toLocaleString()}</span>
+                    </div>
+                    <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          background: "linear-gradient(90deg, #00B4CC 0%, #7B4FD4 100%)",
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: "31%",
-                      background: "linear-gradient(90deg, #00B4CC 0%, #7B4FD4 100%)",
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Model Quotas */}
             <div>
@@ -345,16 +468,16 @@ export function ChatPage() {
                           stroke={model.color}
                           strokeWidth="4"
                           fill="none"
-                          strokeDasharray={`${(model.quota / model.maxQuota) * 126} 126`}
+                          strokeDasharray={`${(getQuota(model.id).quota / getQuota(model.id).maxQuota) * 126} 126`}
                         />
                       </svg>
                       <div className="absolute inset-0 flex items-center justify-center text-xs font-medium text-white">
-                        {model.quota}
+                        {getQuota(model.id).quota}
                       </div>
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-white">{model.name}</p>
-                      <p className="text-xs text-white/60">{model.quota}/{model.maxQuota} req</p>
+                      <p className="text-xs text-white/60">{getQuota(model.id).quota}/{getQuota(model.id).maxQuota} req</p>
                     </div>
                   </div>
                 ))}
